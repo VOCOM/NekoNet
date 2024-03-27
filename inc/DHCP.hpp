@@ -70,12 +70,12 @@ struct Lease {
 
 class DHCP_SERVER {
 public:
-    static int SocketNewDatagram();
-    static void SocketFree();
-    static int SocketBind();
-    static int SocketSendTo();
+    int SocketNewDatagram(udp_recv_fn cb_udp_recv);
+    int SocketBind(uint16_t port);
+    void SocketFree();
+    int SocketSendTo(struct netif* nif, const void* buf, size_t len, uint32_t ip, uint16_t port);
 
-    static uint8_t* Find();
+    static uint8_t* Find(uint8_t* opt, uint8_t cmd);
     /**
      * @brief Write n unsigned bytes.
      *
@@ -83,7 +83,7 @@ public:
      * @param n
      * @param data
      */
-    static void Write(uint8_t** opt, uint8_t, size_t n, const void* data);
+    static void Write(uint8_t** opt, uint8_t cmd, size_t n, const void* data);
     /**
      * @brief Write an 8 bit unsigned char.
      *
@@ -101,15 +101,15 @@ public:
      */
     static void Write(uint8_t** opt, uint8_t cmd, uint32_t val);
 
-    static void Process();
+    static void Process(void* arg, struct udp_pcb* upcb, struct pbuf* p, const ip_addr_t* src_addr, u16_t src_port);
 
     DHCP_SERVER(ip_addr_t* ip, ip_addr_t* nm);
     ~DHCP_SERVER();
 
 private:
-    ip_addr_t ip;
-    ip_addr_t nm;
-    Lease lead[DHCPS_MAX_IP];
+    ip_addr_t ipAddress;
+    ip_addr_t netmask;
+    Lease lease[DHCPS_MAX_IP];
     struct udp_pcb* udp;
 };
 

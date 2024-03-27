@@ -10,9 +10,7 @@
  */
 
 #include <NekoNet.h>
-
-#include <pico/cyw43_arch.h>
-#include <pico/stdlib.h>
+#include <DHCP.hpp>
 
 using namespace std;
 
@@ -20,21 +18,37 @@ static const char* SSID = "NekoNet";
 static const char* PASS = "12345678";
 static bool ledOn = false;
 
-void Heartbeat(int ms);
+typedef struct TCP_SERVER {
+  struct tcp_pcb* server_pcb;
+  bool complete;
+  ip_addr_t gw;
+  async_context* context;
+} TCP_SERVER;
 
 int main() {
   stdio_init_all();
 
-  if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE)) {
-    printf("Wi-Fi init failed");
-    return -1;
-  }
+  TCP_SERVER* state = (TCP_SERVER*)calloc(1, sizeof(TCP_SERVER));
+  if (state == NULL) return 1;
+
+  if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE)) return 1;
 
   cyw43_arch_enable_ap_mode(SSID, PASS, CYW43_AUTH_WPA2_AES_PSK);
+
+  ip4_addr_t netMask;
+  IP4_ADDR(ip_2_ip4(&state->gw), 192, 168, 4, 1);
+  IP4_ADDR(ip_2_ip4(&netMask), 255, 255, 255, 0);
+
+  // Start DHCP server
+  DHCP_SERVER dhcp_server(&state->gw, &netMask);
 
   while (true) {
     Heartbeat(250);
   }
+
+  dhcp_server.~DHCP_SERVER();
+  cyw43_arch_deinit();
+  return 0;
 }
 
 void Heartbeat(int ms) {
