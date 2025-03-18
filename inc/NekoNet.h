@@ -1,17 +1,20 @@
-﻿// NekoNet.h : Include file for standard system include files,
-// or project specific include files.
+﻿/**
+ *@file NekoNet.h
+ * @author Muhd Syamim (Syazam33@gmail.com)
+ * @brief
+ * @version 0.1
+ * @date 2024-04-06
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 
 #pragma once
-
-#include <iostream>
-#include <lwipopts.h>
 
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
 
-// For Intellisense
+ // For Intellisense
 #include <../../pico-sdk/src/boards/include/boards/pico_w.h>
-
-// TODO: Reference additional headers your program requires here.
 
 void Heartbeat(int ms);

@@ -9,6 +9,30 @@
  *
  */
 
+#ifdef DEBUG_DHCP
+#define DEBUG_WRITE printf
+#else
+#define DEBUG_WRITE //
+#endif
+
+#define ERROR_WRITE printf
+
+#define DEFAULT_LEASE_TIME_S (24 * 60 * 60) // in seconds
+
+#define MAC_LEN (6)
+#define MAKE_IP4(a, b, c, d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
+
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <cerrno>
+
+#include <cyw43_config.h>
+
+#include <lwipopts.h>
+#include <lwip/udp.h>
+#include <lwip/ip_addr.h>
+
 #include <DHCP.hpp>
 
 DHCP_SERVER::DHCP_SERVER(ip_addr_t* ip, ip_addr_t* nm) {
@@ -16,9 +40,17 @@ DHCP_SERVER::DHCP_SERVER(ip_addr_t* ip, ip_addr_t* nm) {
     ip_addr_copy(netmask, *nm);
     memset(lease, 0, sizeof(lease));
 
-    if (SocketNewDatagram(Process) != 0) return;
+    if (SocketNewDatagram(Process) != ERR_OK) {
+        ERROR_WRITE("DHCP: Failed to Start\n");
+        return;
+    }
 
-    SocketBind(PORT_DHCP_SERVER);
+    if (SocketBind(PORT_DHCP_SERVER) != ERR_OK) {
+        ERROR_WRITE("DHCP: Failed to Bind\n");
+        return;
+    }
+
+    DEBUG_WRITE("DHCP: Listening on port %d\n", PORT_DHCP_SERVER);
 }
 
 DHCP_SERVER::~DHCP_SERVER() {
@@ -39,7 +71,13 @@ int DHCP_SERVER::SocketNewDatagram(udp_recv_fn cb_udp_recv) {
 }
 
 int DHCP_SERVER::SocketBind(uint16_t port) {
-    return udp_bind(udp, IP_ANY_TYPE, port);
+    err_t err = udp_bind(udp, IP_ANY_TYPE, port);
+    if (err != ERR_OK) {
+        ERROR_WRITE("DHCP: Failed to bind to port %u: %d", port, err);
+        assert(false);
+    }
+
+    return err;
 }
 
 void DHCP_SERVER::SocketFree() {
@@ -55,7 +93,10 @@ int DHCP_SERVER::SocketSendTo(netif* nif, const void* buf, size_t len, uint32_t 
 
     // Allocate RAM space
     struct pbuf* p = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
-    if (p == NULL) return -ENOMEM;
+    if (p == NULL) {
+        ERROR_WRITE("DHCP: Failed to send message out of memory\n");
+        return -ENOMEM;
+    }
 
     memcpy(p->payload, buf, len);
 
@@ -70,7 +111,10 @@ int DHCP_SERVER::SocketSendTo(netif* nif, const void* buf, size_t len, uint32_t 
     // Free RAM space
     pbuf_free(p);
 
-    if (err != ERR_OK) return err;
+    if (err != ERR_OK) {
+        ERROR_WRITE("DNS: Failed to send message %d\n", err);
+        return err;
+    }
 
     return len;
 }
@@ -178,16 +222,22 @@ void DHCP_SERVER::Process(void* arg, udp_pcb* upcb, pbuf* p, const ip_addr_t* sr
             uint8_t yi = o[5] - DHCPS_BASE_IP;
             if (yi >= DHCPS_MAX_IP) goto ignore_request; // Should be NACK
 
-            if (memcmp(d->lease[yi].mac, msg.chaddr, MAC_LEN) == 0);
-            // MAC match, ok to use this IP address
-            else if (memcmp(d->lease[yi].mac, "\x00\x00\x00\x00\x00\x00", MAC_LEN) == 0)
+            if (memcmp(d->lease[yi].mac, msg.chaddr, MAC_LEN) == 0) {
+                // MAC match, ok to use this IP address
+            } else if (memcmp(d->lease[yi].mac, "\x00\x00\x00\x00\x00\x00", MAC_LEN) == 0) {
                 memcpy(d->lease[yi].mac, msg.chaddr, MAC_LEN);
-            else
+            } else {
+                // IP already in use
+                // SHould be NACK
                 goto ignore_request;
+            }
 
             d->lease[yi].expiry = (cyw43_hal_ticks_ms() + DEFAULT_LEASE_TIME_S * 1000) >> 16;
             msg.yiaddr[3] = DHCPS_BASE_IP + yi;
             Write(&opt, DHCP_OPT_MSG_TYPE, (uint8_t)DHCPACK);
+            DEBUG_WRITE("DHCP: Client Connected\nMAC = %02x:%02x:%02x:%02x:%02x:%02x\nIP = %u.%u.%u.%u\n",
+                msg.chaddr[0], msg.chaddr[1], msg.chaddr[2], msg.chaddr[3], msg.chaddr[4], msg.chaddr[5],
+                msg.yiaddr[0], msg.yiaddr[1], msg.yiaddr[2], msg.yiaddr[3]);
 
             break;
         }

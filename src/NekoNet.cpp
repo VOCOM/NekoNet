@@ -11,6 +11,8 @@
 
 #include <NekoNet.h>
 #include <DHCP.hpp>
+#include <DNS.hpp>
+#include <TCP.hpp>
 
 using namespace std;
 
@@ -18,34 +20,30 @@ static const char* SSID = "NekoNet";
 static const char* PASS = "12345678";
 static bool ledOn = false;
 
-typedef struct TCP_SERVER {
-  struct tcp_pcb* server_pcb;
-  bool complete;
-  ip_addr_t gw;
-  async_context* context;
-} TCP_SERVER;
-
 int main() {
   stdio_init_all();
 
-  TCP_SERVER* state = (TCP_SERVER*)calloc(1, sizeof(TCP_SERVER));
-  if (state == NULL) return 1;
+  sleep_ms(1000);
 
   if (cyw43_arch_init_with_country(CYW43_COUNTRY_SINGAPORE)) return 1;
-
   cyw43_arch_enable_ap_mode(SSID, PASS, CYW43_AUTH_WPA2_AES_PSK);
 
+  TCP_SERVER tcp_server(SSID);
+
   ip4_addr_t netMask;
-  IP4_ADDR(ip_2_ip4(&state->gw), 192, 168, 4, 1);
+  IP4_ADDR(ip_2_ip4(&tcp_server.gw), 192, 168, 4, 1);
   IP4_ADDR(ip_2_ip4(&netMask), 255, 255, 255, 0);
 
-  // Start DHCP server
-  DHCP_SERVER dhcp_server(&state->gw, &netMask);
+  DHCP_SERVER dhcp_server(&tcp_server.gw, &netMask);
 
-  while (true) {
+  DNS_SERVER dns_server(&tcp_server.gw);
+
+  tcp_server.complete = false;
+  while (tcp_server.complete == false) {
     Heartbeat(250);
   }
-
+  tcp_server.~TCP_SERVER();
+  dns_server.~DNS_SERVER();
   dhcp_server.~DHCP_SERVER();
   cyw43_arch_deinit();
   return 0;

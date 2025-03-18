@@ -1,14 +1,16 @@
+/**
+ *@file DHCP.hpp
+ * @author Muhd Syamim (Syazam33@gmail.com)
+ * @brief
+ * @version 0.1
+ * @date 2024-04-06
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
+
 #ifndef DHCP
 #define DHCP
-
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-
-#include <cyw43_config.h>
-
-#include <lwip/udp.h>
-#include <lwip/ip_addr.h>
 
 #define DHCPDISCOVER    (1)
 #define DHCPOFFER       (2)
@@ -36,11 +38,6 @@
 
 #define PORT_DHCP_SERVER (67)
 #define PORT_DHCP_CLIENT (68)
-
-#define DEFAULT_LEASE_TIME_S (24 * 60 * 60) // in seconds
-
-#define MAC_LEN (6)
-#define MAKE_IP4(a, b, c, d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
 
 #define DHCPS_BASE_IP   (16)
 #define DHCPS_MAX_IP    (8)
